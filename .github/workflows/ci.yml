@@ -8,4 +8,23 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
-            - run: test -f README.md
+            - name: Determine stack position
+              id: stack
+              env:
+                  EVENT_PATH: ${{ github.event_path }}
+              run: |
+                  if jq -e '.pull_request.stack != null and .pull_request.stack.position < .pull_request.stack.size' "$EVENT_PATH" > /dev/null; then
+                    echo "run_full=false" >> "$GITHUB_OUTPUT"
+                    echo "Interior native stack layer: cheap required check."
+                  else
+                    echo "run_full=true" >> "$GITHUB_OUTPUT"
+                    echo "Tip or ordinary PR: full required check."
+                  fi
+            - name: Cheap interior check
+              if: steps.stack.outputs.run_full == 'false'
+              run: test -f README.md
+            - name: Full tip check
+              if: steps.stack.outputs.run_full == 'true'
+              run: |
+                  test -f README.md
+                  sleep 5
